@@ -18,7 +18,9 @@ import (
 	"github.com/mdaxf/iac/engine/trancode"
 	"github.com/mdaxf/iac/framework/callback_mgr"
 	"github.com/mdaxf/iac/integration/mqttclient"
+	iacmb "github.com/mdaxf/iac/integration/signalr"
 	"github.com/mdaxf/iac/logger"
+	"github.com/mdaxf/signalrsrv/signalr"
 )
 
 func main() {
@@ -47,13 +49,20 @@ func main() {
 		return
 	}
 
+	IACMessageBusClient, err := iacmb.Connect(gconfig.SingalRConfig)
+	if err != nil {
+		ilog.Error(fmt.Sprintf("Failed to connect to IAC Message Bus: %v", err))
+	} else {
+		ilog.Debug(fmt.Sprintf("IAC Message Bus: %v", IACMessageBusClient))
+	}
+
 	if callback_mgr.CallBackMap["TranCode_Execute"] == nil {
 		ilog.Debug("Register the trancode execution interface")
 		tfr := trancode.TranFlowstr{}
 		callback_mgr.RegisterCallBack("TranCode_Execute", tfr.Execute)
 	}
 
-	initializeMqttClient(gconfig, ilog, DB, docDB)
+	initializeMqttClient(gconfig, ilog, DB, docDB, IACMessageBusClient)
 
 	elapsed := time.Since(startTime)
 	ilog.PerformanceWithDuration("iac-mqtt.main", elapsed)
@@ -70,7 +79,7 @@ func initializeloger(gconfig *config.GlobalConfig) error {
 	return nil
 }
 
-func initializeMqttClient(gconfig *config.GlobalConfig, ilog logger.Log, DB *sql.DB, DocDB *documents.DocDB) {
+func initializeMqttClient(gconfig *config.GlobalConfig, ilog logger.Log, DB *sql.DB, DocDB *documents.DocDB, IACMessageBusClient signalr.Client) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
@@ -104,8 +113,9 @@ func initializeMqttClient(gconfig *config.GlobalConfig, ilog logger.Log, DB *sql
 
 		mqtc.DB = DB
 		mqtc.DocDBconn = DocDB
+		mqtc.SignalRClient = IACMessageBusClient
 		mqtc.AppServer = com.ConverttoString(gconfig.AppServer["url"])
-		mqtc.ApiKey = "ahbcgj"
+		mqtc.ApiKey = mqttconfig.ApiKey
 		//config.MQTTClients[fmt.Sprintf("mqttclient_%d", i)] = mqtc
 		mqtc.Initialize_mqttClient()
 		//	fmt.Sprintln("MQTT Client: %v", config.MQTTClients)

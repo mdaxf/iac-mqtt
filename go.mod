@@ -2,7 +2,7 @@ module github.com/mdaxf/iac-mqtt
 
 go 1.21.4
 
-require github.com/mdaxf/iac v0.0.0-20240413000725-f4983d8490b7
+require github.com/mdaxf/iac v0.0.0-20240413022204-fd2732133b2a
 
 require (
 	github.com/IBM/sarama v1.43.0 // indirect
