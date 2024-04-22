@@ -56,48 +56,12 @@ func main() {
 	fmt.Println("IAC MQTT Client Service")
 
 	// Initialize the application
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		Init()
-	}()
-	wg.Wait()
-	elapsed := time.Since(startTime)
-	ilog.PerformanceWithDuration("iac-mqtt.main", elapsed)
-	//	fmt.Printf("iac-mqtt.main total running time:", elapsed)
-	// Start the monitor server
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		startMonitorServer()
-	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			DB := nodecomponent["DB"].(*sql.DB)
-			docDB := nodecomponent["DocDB"].(*documents.DocDB)
-			IACMessageBusClient := nodecomponent["IACMessageBusClient"].(signalr.Client)
-
-			HeartBeat(DB, docDB, IACMessageBusClient)
-			time.Sleep(5 * time.Minute)
-		}
-	}()
-
-	wg.Wait()
-
-	waitForTerminationSignal()
-}
-
-func Init() {
-	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
 		ilog.PerformanceWithDuration("main.Init", elapsed)
 	}()
 
-	var wg sync.WaitGroup
 	err := error(nil)
 
 	gconfig, err = config.LoadGlobalConfig()
@@ -144,6 +108,33 @@ func Init() {
 		initializeMqttClient(DB, docDB, IACMessageBusClient)
 	}()
 	wg.Wait()
+
+	elapsed := time.Since(startTime)
+	ilog.PerformanceWithDuration("iac-mqtt.main", elapsed)
+	//	fmt.Printf("iac-mqtt.main total running time:", elapsed)
+	// Start the monitor server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		startMonitorServer()
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			/*			DB := nodecomponent["DB"].(*sql.DB)
+						docDB := nodecomponent["DocDB"].(*documents.DocDB)
+						IACMessageBusClient := nodecomponent["IACMessageBusClient"].(signalr.Client)
+			*/
+			HeartBeat(DB, docDB, IACMessageBusClient)
+			time.Sleep(5 * time.Minute)
+		}
+	}()
+
+	wg.Wait()
+
+	waitForTerminationSignal()
 }
 
 func HeartBeat(DB *sql.DB, DocDB *documents.DocDB, IACMessageBusClient signalr.Client) {
@@ -272,6 +263,9 @@ func waitForTerminationSignal() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	fmt.Println("\nShutting down...")
+	nodecomponent["DB"].(*sql.DB).Close()
+	nodecomponent["DocDB"].(*documents.DocDB).MongoDBClient.Disconnect(nil)
+	nodecomponent["IACMessageBusClient"].(signalr.Client).Stop()
 	ilog.Debug("Start HeartBeat for iac-activemq application with appid: " + nodedata["AppID"].(string))
 
 	go func() {
